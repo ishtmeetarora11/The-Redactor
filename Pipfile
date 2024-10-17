@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 spacy = "*"
+phonenumbers = "*"
+spacy-transformers = "*"
 
 [dev-packages]
 

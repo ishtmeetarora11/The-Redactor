@@ -4,77 +4,78 @@ import os
 import re
 import sys
 import spacy
-from spacy.matcher import Matcher
+import phonenumbers
 from spacy.tokens import Span
 from warnings import filterwarnings
 
 
 filterwarnings('ignore')
 
-nlp = spacy.load('en_core_web_sm')
+nlp = spacy.load('en_core_web_lg')
+def collect_phone_spans(text):
+    phone_spans = []
+    for match in phonenumbers.PhoneNumberMatcher(text, None):  # 'None' detects numbers from all regions
+        phone_spans.append((match.start, match.end))
+    return phone_spans
 
-def redact_names(doc):
-    redacted_tokens = []
-    for token in doc:
-        if token.ent_type_ == 'PERSON':
-            redacted_tokens.append('█' * len(token.text))
+def merge_spans(spans):
+    if not spans:
+        return []
+    # Sort spans by start position
+    sorted_spans = sorted(spans, key=lambda x: x[0])
+    merged = [sorted_spans[0]]
+    for current in sorted_spans[1:]:
+        last = merged[-1]
+        if current[0] <= last[1]:  # Overlapping spans
+            merged[-1] = (last[0], max(last[1], current[1]))
         else:
-            redacted_tokens.append(token.text)
-    return " ".join(redacted_tokens)
-
-def redact_dates(doc):
-    redacted_tokens = []
-    for token in doc:
-        if token.ent_type_ in ['DATE', 'TIME']:
-            redacted_tokens.append('█' * len(token.text))
-        else:
-            redacted_tokens.append(token.text)
-    return " ".join(redacted_tokens)
-
-def redact_phones(doc):
-    pattern = re.compile(r'(\+?\d{1,2}\s?)?(\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}')
-    redacted_text = pattern.sub(lambda x: '█' * len(x.group()), doc.text)
-    return redacted_text
-
-def redact_addresses(doc):
-    redacted_tokens = []
-    for token in doc:
-        if token.ent_type_ in ['GPE', 'LOC']:
-            redacted_tokens.append('█' * len(token.text))
-        else:
-            redacted_tokens.append(token.text)
-    return " ".join(redacted_tokens)
-
-def redact_concepts(doc, concepts):
-    redacted_text = doc.text
-    for concept in concepts:
-        redacted_text = re.sub(rf"\b{re.escape(concept)}\b", lambda x: '█' * len(x.group()), redacted_text, flags=re.IGNORECASE)
-    return redacted_text
+            merged.append(current)
+    return merged
 
 def process_file(file_path, args, stats):
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             text = f.read()
         doc = nlp(text)
+        # for ent in doc.ents:
+        #     print(ent.text, ent.label_)
+        spans_to_redact = []
 
-        redacted_text = doc.text
-
-        # Redaction steps
         if args.names:
-            redacted_text = redact_names(nlp(redacted_text))
-            stats['names'] += 1
+            name_spans = [(ent.start_char, ent.end_char) for ent in doc.ents if ent.label_ == 'PERSON']
+            spans_to_redact.extend(name_spans)
+            stats['names'] += len(name_spans)
         if args.dates:
-            redacted_text = redact_dates(nlp(redacted_text))
-            stats['dates'] += 1
-        if args.phones:
-            redacted_text = redact_phones(nlp(redacted_text))
-            stats['phones'] += 1
+            date_spans = [(ent.start_char, ent.end_char) for ent in doc.ents if ent.label_ in ['DATE', 'TIME']]
+            spans_to_redact.extend(date_spans)
+            stats['dates'] += len(date_spans)
         if args.address:
-            redacted_text = redact_addresses(nlp(redacted_text))
-            stats['addresses'] += 1
+            address_spans = [(ent.start_char, ent.end_char) for ent in doc.ents if ent.label_ in ['GPE', 'LOC']]
+            spans_to_redact.extend(address_spans)
+            stats['addresses'] += len(address_spans)
         if args.concept:
-            redacted_text = redact_concepts(nlp(redacted_text), args.concept)
-            stats['concepts'] += 1
+            concept_spans = []
+            for concept in args.concept:
+                for match in re.finditer(rf'\b{re.escape(concept)}\b', text, re.IGNORECASE):
+                    concept_spans.append((match.start(), match.end()))
+            spans_to_redact.extend(concept_spans)
+            stats['concepts'] += len(concept_spans)
+        if args.phones:
+            phone_spans = collect_phone_spans(text)
+            spans_to_redact.extend(phone_spans)
+            stats['phones'] += len(phone_spans)
+
+        # Merge overlapping spans
+        spans_to_redact = merge_spans(spans_to_redact)
+
+        # Build redacted text
+        redacted_text = ''
+        last_idx = 0
+        for start_char, end_char in spans_to_redact:
+            redacted_text += text[last_idx:start_char]
+            redacted_text += '█' * (end_char - start_char)
+            last_idx = end_char
+        redacted_text += text[last_idx:]
 
         base_name = os.path.basename(file_path)
         censored_file_name = os.path.join(args.output, base_name + '.censored')
