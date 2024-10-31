@@ -17,8 +17,6 @@ Storing Redacted Data: Writing the redacted text to an output directory for furt
 
 Generating Statistics: Summarizing the redaction process by counting the types and instances of redacted entities.
 
-This program streamlines the redaction process, making it more efficient and less time-consuming compared to manual redaction.
-
 ## How to install
 
 ```
