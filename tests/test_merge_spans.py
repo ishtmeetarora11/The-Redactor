@@ -1,5 +1,5 @@
 import unittest
-from redact import merge_overlapping_spans
+from redactor import merge_overlapping_spans
 
 class TestMergeOverlappingSpans(unittest.TestCase):
     def test_no_overlaps(self):

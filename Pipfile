@@ -11,6 +11,7 @@ nltk = "*"
 snorkel = "*"
 transformers = "*"
 inflect = "*"
+pytest = "*"
 
 [dev-packages]
 
