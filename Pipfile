@@ -9,6 +9,8 @@ phonenumbers = "*"
 spacy-transformers = "*"
 nltk = "*"
 snorkel = "*"
+transformers = "*"
+inflect = "*"
 
 [dev-packages]
 
