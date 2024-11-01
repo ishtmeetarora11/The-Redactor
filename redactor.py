@@ -8,10 +8,11 @@ from warnings import filterwarnings
 import spacy
 from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
+# Suppress all warnings
 filterwarnings('ignore')
 
-# regexfor phone numbers
-phone_designs = [
+# Define custom token patterns for phone numbers
+PHONE_PATTERNS = [
     # Format: 123-456-7890
     {"label": "PHONE", "pattern": [{"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "dddd"}]},
     # Format: (123) 456-7890
@@ -28,8 +29,8 @@ phone_designs = [
     {"label": "PHONE", "pattern": [{"SHAPE": "dddddddddd"}]},
 ]
 
-# regex for dates
-date_designs = [
+# Define custom token patterns for dates
+DATE_PATTERNS = [
     # Format: 14 Jun 2000
     {"label": "DATE", "pattern": [{"SHAPE": "dd"}, {"IS_ALPHA": True}, {"SHAPE": "dddd"}]},
     # Format: Jun 14, 2000
@@ -46,8 +47,9 @@ date_designs = [
     {"label": "DATE", "pattern": [{"IS_ALPHA": True}, {"SHAPE": "dd,"}, {"SHAPE": "dddd"}]},
 ]
 
-# regex for addresses
-address_designs = [
+# Define custom token patterns for addresses
+ADDRESS_PATTERNS = [
+    # Format: 123 Main Street
     {"label": "ADDRESS", "pattern": [
         {"LIKE_NUM": True},
         {"IS_ALPHA": True, "OP": "+"},
@@ -58,6 +60,7 @@ address_designs = [
             "apt", "suite", "ste"
         ]}}
     ]},
+    # Format: 123 Main St.
     {"label": "ADDRESS", "pattern": [
         {"LIKE_NUM": True},
         {"IS_ALPHA": True, "OP": "+"},
@@ -70,32 +73,63 @@ address_designs = [
     ]},
 ]
 
-# regex for person names in email addresses
-name_designs = [
+# Define custom token patterns for person names in email addresses
+NAME_PATTERNS = [
+    # Matches email addresses like 'robert.badeer@enron.com'
     {"label": "PERSON", "pattern": [{"LOWER": {"REGEX": "^[a-z]+(\\.[a-z]+)+$"}}]},
+    # Matches names with underscores like 'robert_badeer'
     {"label": "PERSON", "pattern": [{"LOWER": {"REGEX": "^[a-z]+(_[a-z]+)+$"}}]},
+    # Matches capitalized names in headers and signatures
     {"label": "PERSON", "pattern": [{"IS_TITLE": True}, {"IS_TITLE": True, "OP": "+"}]},
 ]
 
-# Initialize SpaCy with the large English model and add custom entity patterns
-nlp = spacy.load('en_core_web_lg')
-entity_ruler = nlp.add_pipe("entity_ruler", before="ner")
-entity_ruler.add_patterns(phone_designs + date_designs + address_designs + name_designs)
+def initialize_spacy_nlp():
+    """
+    Initialize and return the SpaCy NLP pipeline with custom patterns.
+    Uses lazy loading to ensure the model is loaded only once.
+    
+    Returns:
+        spacy.language.Language: The initialized SpaCy NLP pipeline.
+    
+    Raises:
+        OSError: If the SpaCy model 'en_core_web_lg' is not installed.
+    """
+    if not hasattr(initialize_spacy_nlp, "nlp"):
+        try:
+            nlp = spacy.load('en_core_web_lg')
+            entity_ruler = nlp.add_pipe("entity_ruler", before="ner")
+            entity_ruler.add_patterns(PHONE_PATTERNS + DATE_PATTERNS + ADDRESS_PATTERNS + NAME_PATTERNS)
+            nlp.add_pipe('sentencizer')
+            initialize_spacy_nlp.nlp = nlp
+        except OSError as e:
+            sys.stderr.write(
+                "SpaCy model 'en_core_web_lg' not found. Please install it using:\n"
+                "    python -m spacy download en_core_web_lg\n"
+            )
+            raise e
+    return initialize_spacy_nlp.nlp
 
-
-# Initialize Hugging Face NER pipeline with a pre-trained model
-hf_tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
-hf_model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER")
-hf_ner_pipeline = pipeline("ner", model=hf_model, tokenizer=hf_tokenizer, aggregation_strategy="simple")
-
+def initialize_hf_pipeline():
+    """
+    Initialize and return the Hugging Face NER pipeline.
+    Uses lazy loading to ensure the pipeline is initialized only once.
+    
+    Returns:
+        transformers.pipeline.Pipeline: The initialized Hugging Face NER pipeline.
+    """
+    if not hasattr(initialize_hf_pipeline, "pipeline"):
+        tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
+        model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER")
+        initialize_hf_pipeline.pipeline = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
+    return initialize_hf_pipeline.pipeline
 
 def merge_overlapping_spans(spans):
     """
     Merge overlapping or adjacent character spans.
-
+    
     Args:
         spans (list of tuples): List of (start, end) character indices.
-
+    
     Returns:
         list of tuples: Merged list of character index ranges.
     """
@@ -116,15 +150,14 @@ def merge_overlapping_spans(spans):
 
     return merged
 
-
 def identify_concept_sentences(text, concepts):
     """
     Identify sentences containing specified concepts for redaction.
-
+    
     Args:
         text (str): The text to search within.
         concepts (list of str): List of concepts to find.
-
+    
     Returns:
         list of tuples: Character index ranges of sentences containing any of the concepts.
     """
@@ -143,19 +176,22 @@ def identify_concept_sentences(text, concepts):
 
     return concept_spans
 
-
 def redact_entities_spacy(text, targets, stats):
     """
     Redact entities identified by SpaCy based on target categories.
-
+    
     Args:
         text (str): The text to redact.
         targets (list of str): List of target categories to redact.
         stats (dict): Dictionary to track redaction counts.
-
+    
     Returns:
         list of tuples: Character index ranges to redact.
     """
+    nlp = initialize_spacy_nlp()
+    doc = nlp(text)
+    redaction_spans = []
+
     label_mapping = {
         'PERSON': 'names',
         'DATE': 'dates',
@@ -165,9 +201,6 @@ def redact_entities_spacy(text, targets, stats):
         'LOC': 'addresses'
     }
 
-    doc = nlp(text)
-    redaction_spans = []
-
     for ent in doc.ents:
         category = label_mapping.get(ent.label_)
         if category and category in targets:
@@ -176,20 +209,20 @@ def redact_entities_spacy(text, targets, stats):
 
     return redaction_spans
 
-
 def redact_entities_hf(text, targets, stats):
     """
     Redact entities identified by Hugging Face NER based on target categories.
-
+    
     Args:
         text (str): The text to redact.
         targets (list of str): List of target categories to redact.
         stats (dict): Dictionary to track redaction counts.
-
+    
     Returns:
         list of tuples: Character index ranges to redact.
     """
-    ner_results = hf_ner_pipeline(text)
+    ner_pipeline = initialize_hf_pipeline()
+    ner_results = ner_pipeline(text)
     redaction_spans = []
 
     # Mapping Hugging Face entity labels to statistics keys
@@ -206,16 +239,15 @@ def redact_entities_hf(text, targets, stats):
 
     return redaction_spans
 
-
 def redact_email_headers(text, targets, stats):
     """
     Redact names found in email headers.
-
+    
     Args:
         text (str): The text to redact.
         targets (list of str): List of target categories to redact.
         stats (dict): Dictionary to track redaction counts.
-
+    
     Returns:
         list of tuples: Character index ranges to redact.
     """
@@ -258,16 +290,15 @@ def redact_email_headers(text, targets, stats):
 
     return redaction_spans
 
-
 def redact_entities_regex(text, targets, stats):
     """
     Redact entities identified by regular expressions based on target categories.
-
+    
     Args:
         text (str): The text to redact.
         targets (list of str): List of target categories to redact.
         stats (dict): Dictionary to track redaction counts.
-
+    
     Returns:
         list of tuples: Character index ranges to redact.
     """
@@ -355,11 +386,10 @@ def redact_entities_regex(text, targets, stats):
 
     return redaction_spans
 
-
 def write_stats(stats, destination):
     """
     Output redaction statistics to the specified destination.
-
+    
     Args:
         stats (dict): Dictionary containing redaction counts.
         destination (str): Destination for statistics ('stderr', 'stdout', or file path).
@@ -382,11 +412,10 @@ def write_stats(stats, destination):
         except Exception as e:
             sys.stderr.write(f"Failed to write statistics to {destination}: {e}\n")
 
-
 def process_file(file_path, args, stats):
     """
     Process and redact a single text file.
-
+    
     Args:
         file_path (str): Path to the input text file.
         args (Namespace): Parsed command-line arguments.
@@ -446,7 +475,6 @@ def process_file(file_path, args, stats):
     except Exception as e:
         sys.stderr.write(f"Error writing to file {censored_file_name}: {e}\n")
 
-
 def main():
     """
     Main function to parse arguments and initiate the redaction process.
@@ -486,7 +514,6 @@ def main():
 
     # Write the redaction statistics to the specified destination
     write_stats(redaction_stats, args.stats)
-
 
 if __name__ == '__main__':
     main()

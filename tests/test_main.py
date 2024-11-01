@@ -2,6 +2,7 @@ import unittest
 import sys
 from unittest.mock import patch, Mock
 from redactor import main
+import spacy
 
 class TestMainFunction(unittest.TestCase):
     @patch('redactor.glob.glob', return_value=['sample1.txt', 'sample2.txt'])
