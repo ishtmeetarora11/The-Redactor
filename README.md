@@ -58,17 +58,67 @@ Processing Files: Loops through the input files and applies redaction based on t
 
 Outputting Statistics: Writes redaction counts to the chosen destination (stdout, stderr, or file).
 
-### Command-Line Arguments
+### Command-Line Arguments ( Parameters )
 
 ```
     --input: Glob pattern to specify input files.
     --output: Directory to save redacted files.
     --names: Redacts names from the text. (Name of only Persons/People)
+        Description: Redacts names of people mentioned in the text. This includes both first and last names, names with initials, and commonly capitalized names.
+
+        Detection Method:
+        SpaCy’s Named Entity Recognition (NER) model, which recognizes PERSON entities.
+        Custom regex patterns for capitalized words in email headers and names in common formats.
+
     --dates: Redacts dates from the text.
+        Description: Redacts any written date in various common formats, such as 4/9/2025, April 9th, 2025, or 22-02-2022.
+
+        Detection Method:
+            Custom regex patterns for multiple date formats.
+            SpaCy’s NER model, which detects DATE entities.
+
     --phones: Redacts phone numbers from the text.
+        Description: Redacts phone numbers in various formats, including international, local, and common representations.
+
+        Detection Method:
+            Custom regex patterns to capture phone numbers in formats like (123) 456-7890, 123-456-7890, +1 123-456-7890, etc.
+
     --address: Redacts addresses from the text.
+        Description: Redacts physical addresses, typically street addresses, that may include street names, city names, and postal codes.
+
+        Detection Method:
+            Custom regex patterns to detect common address structures.
+            SpaCy’s NER model to detect GPE (Geo-Political Entity) and LOC (location) entities.
+
     --concept: Specifies concepts to redact in sentences.
+        Description: Redacts sentences or paragraphs containing specific "concepts." A concept represents an idea or theme that may be sensitive.
+
+        Parameter: Accepts one or more words or phrases as arguments. Each word or phrase represents a concept that needs to be redacted.
+
+        Context Definition: A "concept" is defined as a word or theme and its semantic associations. For example, the concept of prison might include similar terms like jail, incarceration, or detention.
+
+        The program uses regular expressions to find sentences containing exact matches of the provided concept words.
+        SpaCy's NLP model helps identify sentences where contextually similar terms (e.g., prison and jail) may occur in the same semantic context.
+
     --stats: Specifies where to output redaction statistics (stderr, stdout, or a filepath).
+
+        Description: Outputs a summary report showing the total count of each type of redacted entity across all processed files. This flag specifies the destination for this report, which can be set to stdout, stderr, or a specific file path.
+
+        Parameters:
+            Accepts a single argument to define where the statistics report should be sent:
+            stdout - Prints the report to the standard output.
+            stderr - Prints the report to the standard error stream.
+            file path - Saves the report to a specified file path.
+        
+        output format:
+            Names redacted: 
+            Dates redacted: 
+            Phone numbers redacted: 
+            Addresses redacted: 
+            Concepts redacted: 
+
+        The write_stats function aggregates and writes the total counts of all redacted entities from all input files.
+        If an error occurs while writing to a file path (e.g., if the path is invalid), an error message is printed to stderr.
 
 ```
 
