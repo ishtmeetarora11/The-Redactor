@@ -46,40 +46,27 @@ pipenv run pytest
 ```
 
 
-## Functions
+## Functions in Redactor.py
 
-#### main.py 
+#### main()
 
-The main(url) function runs everything together:
+The main function initiates the redaction process by:
 
-1. **`incident_data = fetchIncidents(url)`**:
-   - Fetches incident data from the provided URL.
+Parsing Command-Line Arguments: Defines input files, output directory, entity types to redact, and where to write statistics.
 
-2. **`incidents = extractIncidents(incident_data)`**:
-   - Extracts and processes incidents from the fetched data.
+Processing Files: Loops through the input files and applies redaction based on the specified parameters.
 
-3. **`db = createdb()`**:
-   - Initializes the database.
+Outputting Statistics: Writes redaction counts to the chosen destination (stdout, stderr, or file).
 
-4. **`populatedb(db, incidents)`**:
-   - Inserts the extracted incidents into the initialized database.
-
-5. **`status(db)`**:
-   - Checks or reports the status of the database.
-
-### fetchincidents.py
+### initialize_spacy_nlp()
 
 ```
-def fetchIncidents(url, headers={}):
+def initialize_spacy_nlp():
 
-    This function fetches an incident PDF file from a given URL using Python’s urllib.request library. It sends an HTTP request to the specified URL, optionally including additional headers, and returns the content of the PDF as a BytesIO object.
-
-    Args:
-        url (str): The URL from which the incident PDF is to be downloaded.
-        headers (dict, optional): A dictionary of optional HTTP headers to be included in the request. If no headers are provided, an empty dictionary is used by default.
+    Initializes a SpaCy NLP pipeline with custom entity recognition patterns for redacting names, dates, phone numbers, and addresses. Uses lazy loading to load the model only once.
         
     Returns:
-        BytesIO: A BytesIO object containing the binary content of the incident PDF file. Using this later to read and process the PDF data in memory.
+        A SpaCy NLP pipeline configured with custom patterns.
 
 ```
 
