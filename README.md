@@ -58,10 +58,9 @@ Processing Files: Loops through the input files and applies redaction based on t
 
 Outputting Statistics: Writes redaction counts to the chosen destination (stdout, stderr, or file).
 
-### initialize_spacy_nlp()
+### Command-Line Arguments
 
 ```
-    Command-Line Arguments
     --input: Glob pattern to specify input files.
     --output: Directory to save redacted files.
     --names: Redacts names from the text. (Name of only Persons/People)
@@ -223,7 +222,7 @@ def write_stats(stats, destination):
 ### process_file(file_path, args, stats)
 
 ```
-def write_stats(stats, destination):
+def process_file(file_path, args, stats):
 
     Processes a single text file, applying redaction based on specified arguments, and saves the redacted content.
 
@@ -249,46 +248,126 @@ def write_stats(stats, destination):
 
 ## Test Cases
 
-### test_db.py
+### test_address.py
 
-This tests the functionality of a database-related module (db) using the pytest framework and mocking (unittest.mock). It ensures that the database is created, populated, and can produce a status summary, all without writing to disk (by using an in-memory SQLite database).
+test_redact_address_spacy: Tests the redact_entities_spacy function by providing a sample address. Asserts that no address is detected to check if the function works correctly with a non-matching target.
 
-The patch() function is used to mock sqlite3.connect so that when the db.createdb() function is called, it creates an in-memory database instead of a file-based one.
-
-The db.createdb() function is called, which creates the database schema (table) and returns a connection object (conn).
-
-After the test using this fixture is completed, the connection is closed (conn.close()).
-
-The connection object is then passed to the test functions (test_createdb, test_populatedb, and test_status).
-
-The test checks that the createdb() function successfully creates the incidents table in the database.
-
-The test verifies that the populatedb() function correctly inserts data into the incidents table.
-
-The test checks that the status() function correctly generates a summary of incidents by nature (e.g., "Theft|1", "Assault|1") and prints it.
-
-### test_extractincidents.py
-
-This test case is designed to verify that the extractIncidents function from the extractincidents module correctly processes a PDF containing incident records and extracts the relevant data into structured dictionaries.
-
-The mock PDF content is structured to resemble the layout of the actual incident PDF, with headers like Date / Time, Incident Number, Location, Nature, and Incident ORI. Two sample incidents are included
-
-The PDF data is read and stored in the variable info
-
-The extractIncidents function is called with the fetched PDF data (info). The function processes the binary data, extracts incident information, and returns it as a list of dictionaries.
-
-Two assertions are made to ensure that the data is correctly extracted
+test_redact_address_regex: Tests the redact_entities_regex function by providing an address in text format. Asserts that one address is detected using regex.
 
 
-### test_incident.py
+### test_concepts.py
 
-This test case is designed to validate the behavior of the fetchIncidents function by mocking the network request (urllib.request.urlopen). It ensures that the function properly sends the HTTP request, sets the appropriate headers, and handles the response
+test_identify_concept_sentences: Tests the identify_concept_sentences function by providing text with specific concepts. Asserts that sentences containing specified concepts are correctly identified.
 
-The @patch('urllib.request.urlopen') decorator is used to replace the actual urlopen function with a mock object. This allows the test to simulate the behavior of a real HTTP request without actually making a network call.
 
-The mock object (mock_urlopen) is passed as an argument to the test function.
+### test_dates.py
 
-The test uses http://example.com/test as the sample URL, which simulates the URL that the fetchIncidents function will use to fetch data.
+test_redact_dates_spacy: Tests the redact_entities_spacy function to detect dates in the text. Asserts that one date is detected using SpaCy.
 
-The test asserts that the value returned by fetchIncidents matches the expected value b"Ishtmeet", which was set in the mock response.
+test_redact_dates_regex: Tests the redact_entities_regex function to detect multiple dates in different formats. Asserts that two dates are correctly identified using regex.
+
+
+### test_identify_concepts.py
+
+test_no_concepts: Verifies that no concepts are detected if the text does not contain specified keywords.
+
+test_single_concept: Checks if a single concept is identified and redacted correctly in the text.
+
+test_multiple_concepts: Tests multiple concept detection within the text and ensures the correct spans are returned.
+
+test_concepts_case_insensitive: Verifies that the function is case-insensitive by detecting concepts written in different cases.
+
+test_concepts_partial_match: Ensures that only exact matches are detected, ignoring partial matches within words.
+
+
+### test_main.py
+
+test_main_success: Mocks file processing to ensure main function correctly processes multiple files with specified options and calls the appropriate functions.
+
+test_main_no_files_matched: Verifies that an error message is displayed when no files match the input pattern.
+
+test_main_with_single_file: Tests the main function with a single file and verifies that processing functions are called correctly.
+
+
+### test_merge_spans.py
+
+test_no_overlaps: Tests that non-overlapping spans are returned as-is without modification.
+
+test_with_overlaps: Ensures overlapping spans are merged into a single span.
+
+test_adjacent_spans: Verifies that adjacent spans are merged into one span.
+
+test_nested_spans: Checks if nested spans are merged into a single span correctly.
+
+test_empty_spans: Confirms that an empty list of spans returns an empty result without errors.
+
+
+### test_names.py
+
+test_redact_person_names_spacy: Tests if SpaCy detects and redacts a person’s name in the text.
+
+test_redact_person_names_hf: Verifies that Hugging Face NER detects and redacts a person’s name in the text.
+
+test_redact_person_names_regex: Tests if regex successfully identifies and redacts multiple person names in the text.
+
+
+### test_phones.py
+
+test_redact_phone_numbers_spacy: Checks if SpaCy correctly detects and redacts a phone number in the text.
+
+test_redact_phone_numbers_regex: Verifies that regex identifies multiple phone numbers in various formats and redacts them.
+
+
+### test_process_file.py
+
+test_process_file_success: Tests process_file with mocked functions to verify that redactions are applied correctly, the output file is written, and statistics are updated accurately.
+
+test_process_file_read_error: Verifies that an error message is output to stderr when there is an issue reading the input file.
+
+
+### test_redact_email_headers.py
+
+test_redact_names_in_headers: Tests redact_email_headers to confirm that names in email headers are correctly detected and redacted, and the statistics are updated accurately.
+
+
+### test_redact_entities_regex.py
+
+test_no_matches: Checks that no redactions are applied if the text does not contain any of the specified entities.
+
+test_overlapping_matches: Ensures that overlapping entities (e.g., name and phone number) are handled correctly by the regex redaction method, and statistics are updated accurately.
+
+
+### test_write_stats.py
+
+test_write_stats_to_file: Tests writing redaction statistics to a file by verifying the file content.
+
+test_write_stats_to_stdout: Checks if redaction statistics are correctly output to stdout.
+
+test_write_stats_to_stderr: Ensures redaction statistics are written to stderr when specified.
+
+test_write_stats_to_file_failure: Verifies that an error message is output to stderr if there is a failure in writing statistics to a file.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
