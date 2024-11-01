@@ -48,7 +48,7 @@ pipenv run pytest
 
 ## Functions in Redactor.py
 
-#### main()
+### main()
 
 The main function initiates the redaction process by:
 
@@ -70,72 +70,151 @@ def initialize_spacy_nlp():
 
 ```
 
-### extractincidents.py
+### initialize_hf_pipeline()
 
 ```
-def extractIncidents(incident_data):
+def initialize_hf_pipeline():
 
-    This function processes binary incident data from a PDF and extracts relevant incident records. It uses the PyPDF library to read the PDF and regular expressions to parse the data into structured information.
-
-    Args:
-        incident_data (bytes): Binary data of the PDF file that contains incident information, fetched from the URL.
+    Initializes a Hugging Face NER pipeline using the dslim/bert-base-NER model. This pipeline is used for entity detection in the redaction process.
         
     Returns:
-        list: list of dictionaries, where each dictionary represents an individual incident. Each dictionary contains the following keys:
-        'Date_Time': The date and time of the incident.
-        'Incident Number': A unique identifier for the incident.
-        'Location': The location where the incident occurred.
-        'Nature': The nature or type of the incident.
-        'ORI': The originating agency identifier.
+        A Hugging Face pipeline object for Named Entity Recognition (NER).
 
 ```
-### db.py
+### merge_overlapping_spans(spans)
 
 ```
-def createdb():
+def merge_overlapping_spans(spans):
 
-    This function is responsible for creating a fresh SQLite database and initializing a table for storing incident records. If the database already exists, it deletes it before creating a new one.
+    Merges overlapping or adjacent character spans to ensure there are no redundant redactions in overlapping areas.
         
-    connection: An SQLite database connection object that can be used for further database operations.
+    Args:
+        spans (list of tuples): List of character index ranges to merge.
 
-    An SQL command is executed to create a table named incidents. The table contains the following fields:
-
-    incident_time (TEXT): The date and time of the incident.
-    incident_number (TEXT): The incident’s unique identifier.
-    incident_location (TEXT): The location of the incident.
-    nature (TEXT): The type or nature of the incident.
-    incident_ori (TEXT): The originating agency identifier.
+    Returns:
+        A list of merged spans.
+        
+```
+### identify_concept_sentences(text, concepts)
 
 ```
-```
-def populatedb(conn, incidents):
+def identify_concept_sentences(text, concepts):
 
-    This function populates the database with incident records. It inserts data into the incidents table using a list of dictionaries, each representing an incident.
+    Identifies sentences containing specified concepts (e.g., "confidential") for redaction.
 
     Args:
-        conn (sqlite3.Connection): The database connection object created by createdb().
+        text (str): The text to analyze.
 
-        incidents (list): A list of dictionaries, where each dictionary represents an incident with fields like 'Date_Time', 'Incident Number', 'Location', 'Nature', and 'ORI'.
+        concepts (list of str): List of keywords or phrases to identify.
         
-    Inserting data:
-        The incidents list is transformed into a list of tuples, each containing values in the following order: Date_Time, Incident Number, Location, Nature, and ORI.
-
-        The executemany method is used to insert multiple rows into the incidents table. Each tuple is inserted into the table using placeholders (?, ?, ?, ?, ?), corresponding to the five columns.
+    Returns:
+        List of character index ranges for sentences containing any specified concepts.
 
 ```
-```
-def status(conn):
 
-    This function queries the database and outputs a summary of incident types (nature) along with the number of occurrences for each type.
+### redact_entities_hf(text, targets, stats)
+
+```
+def redact_entities_spacy(text, targets, stats):
+
+    Uses Hugging Face’s NER pipeline to identify and redact specified entities.
 
     Args:
-        conn (sqlite3.Connection): The database connection object created by createdb().
+        text (str): Text to be redacted.
+
+        targets (list of str): List of entities to redact (e.g., ['names', 'addresses']).
+
+        stats (dict): Dictionary tracking redaction counts.
         
-    Printing Results:
+    Returns:
+        List of character index ranges to redact.
 
-        An SQL SELECT statement is executed to count the occurrences of each type of incident (nature) in the incidents table. The results are grouped by the nature column and sorted alphabetically.
+```
 
-        The function iterates through the result set, printing each incident type (nature) and its count in the format nature|count.
+### redact_entities_spacy(text, targets, stats)
+
+```
+def redact_entities_spacy(text, targets, stats):
+
+    Uses the SpaCy pipeline to identify and redact specific entities in the text based on target categories (e.g., names, dates).
+
+    Args:
+        text (str): Text to be redacted.
+
+        targets (list of str): List of entities to redact (e.g., ['names', 'dates']).
+
+        stats (dict): Dictionary tracking redaction counts.
+        
+    Returns:
+        List of character index ranges to redact.
+
+```
+
+### redact_email_headers(text, targets, stats)
+
+```
+def redact_email_headers(text, targets, stats):
+
+    Redacts names found in email headers (such as 'From', 'To', 'Cc') within the text.
+
+    Args:
+        text (str): Text to be redacted.
+
+        targets (list of str): List of entity types to redact (e.g., ['names']).
+
+        stats (dict): Dictionary tracking redaction counts.
+        
+    Returns:
+        List of character index ranges to redact.
+
+```
+
+### redact_entities_regex(text, targets, stats)
+
+```
+def redact_entities_regex(text, targets, stats):
+
+    Uses regular expressions to identify and redact specified entities, such as phone numbers, dates, and names, based on pattern matching.
+
+    Args:
+        text (str): Text to be redacted.
+
+        targets (list of str): List of entities to redact (e.g., ['phones', 'dates']).
+
+        stats (dict): Dictionary tracking redaction counts.
+        
+    Returns:
+        List of character index ranges to redact.
+
+```
+
+### write_stats(stats, destination)
+
+```
+def write_stats(stats, destination):
+
+    Outputs the redaction statistics to the specified destination (stderr, stdout, or a file path).
+
+    Args:
+        stats (dict): Dictionary containing counts of redacted items by category.
+
+        destination (str): Output destination for statistics.
+
+```
+
+### process_file(file_path, args, stats)
+
+```
+def write_stats(stats, destination):
+
+    Processes a single text file, applying redaction based on specified arguments, and saves the redacted content.
+
+    Args:
+        file_path (str): Path of the input file.
+
+        args (Namespace): Parsed command-line arguments with options for redaction.
+        
+        stats (dict): Dictionary to accumulate redaction statistics.
 
 ```
 
