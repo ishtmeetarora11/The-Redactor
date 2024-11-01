@@ -13,43 +13,29 @@ filterwarnings('ignore')
 
 # Define custom token patterns for phone numbers
 PHONE_PATTERNS = [
-    # Format: 123-456-7890
+    # Different phone number formats (e.g., 123-456-7890, (123) 456-7890)
     {"label": "PHONE", "pattern": [{"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "dddd"}]},
-    # Format: (123) 456-7890
     {"label": "PHONE", "pattern": [{"ORTH": "("}, {"SHAPE": "ddd"}, {"ORTH": ")"}, {"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "dddd"}]},
-    # Format: +1 123-456-7890
     {"label": "PHONE", "pattern": [{"ORTH": "+"}, {"SHAPE": "d"}, {"IS_SPACE": True}, {"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "dddd"}]},
-    # Format: 1-123-456-7890
     {"label": "PHONE", "pattern": [{"SHAPE": "d"}, {"ORTH": "-"}, {"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "ddd"}, {"ORTH": "-"}, {"SHAPE": "dddd"}]},
-    # Format: 123.456.7890
     {"label": "PHONE", "pattern": [{"SHAPE": "ddd"}, {"ORTH": "."}, {"SHAPE": "ddd"}, {"ORTH": "."}, {"SHAPE": "dddd"}]},
-    # Format: 123 456 7890
     {"label": "PHONE", "pattern": [{"SHAPE": "ddd"}, {"IS_SPACE": True}, {"SHAPE": "ddd"}, {"IS_SPACE": True}, {"SHAPE": "dddd"}]},
-    # Format: 1234567890
     {"label": "PHONE", "pattern": [{"SHAPE": "dddddddddd"}]},
 ]
 
 # Define custom token patterns for dates
 DATE_PATTERNS = [
-    # Format: 14 Jun 2000
+    # Different date formats (e.g., 14 Jun 2000, 06/14/2000)
     {"label": "DATE", "pattern": [{"SHAPE": "dd"}, {"IS_ALPHA": True}, {"SHAPE": "dddd"}]},
-    # Format: Jun 14, 2000
     {"label": "DATE", "pattern": [{"IS_ALPHA": True}, {"SHAPE": "dd,"}, {"SHAPE": "dddd"}]},
-    # Format: 06/14/2000
     {"label": "DATE", "pattern": [{"SHAPE": "dd/dd/dddd"}]},
-    # Format: 06-14-2000
     {"label": "DATE", "pattern": [{"SHAPE": "dd-dd-dddd"}]},
-    # Format: 14/06/2000
-    {"label": "DATE", "pattern": [{"SHAPE": "dd/dd/dddd"}]},
-    # Format: 14-06-2000
-    {"label": "DATE", "pattern": [{"SHAPE": "dd-dd-dddd"}]},
-    # Format: June 14, 2000
     {"label": "DATE", "pattern": [{"IS_ALPHA": True}, {"SHAPE": "dd,"}, {"SHAPE": "dddd"}]},
 ]
 
 # Define custom token patterns for addresses
 ADDRESS_PATTERNS = [
-    # Format: 123 Main Street
+    # Common address formats (e.g., 123 Main Street)
     {"label": "ADDRESS", "pattern": [
         {"LIKE_NUM": True},
         {"IS_ALPHA": True, "OP": "+"},
@@ -60,62 +46,40 @@ ADDRESS_PATTERNS = [
             "apt", "suite", "ste"
         ]}}
     ]},
-    # Format: 123 Main St.
-    {"label": "ADDRESS", "pattern": [
-        {"LIKE_NUM": True},
-        {"IS_ALPHA": True, "OP": "+"},
-        {"LOWER": {"IN": [
-            "street", "st.", "avenue", "ave.", "road", "rd.", "boulevard", "blvd.",
-            "lane", "ln.", "drive", "dr.", "court", "ct.", "highway", "hwy.",
-            "place", "pl.", "square", "sq.", "building", "bldg.", "apartment",
-            "apt.", "suite", "ste."
-        ]}}
-    ]},
 ]
 
 # Define custom token patterns for person names in email addresses
 NAME_PATTERNS = [
-    # Matches email addresses like 'robert.badeer@enron.com'
+    # Different name formats in emails or capitalized text
     {"label": "PERSON", "pattern": [{"LOWER": {"REGEX": "^[a-z]+(\\.[a-z]+)+$"}}]},
-    # Matches names with underscores like 'robert_badeer'
     {"label": "PERSON", "pattern": [{"LOWER": {"REGEX": "^[a-z]+(_[a-z]+)+$"}}]},
-    # Matches capitalized names in headers and signatures
     {"label": "PERSON", "pattern": [{"IS_TITLE": True}, {"IS_TITLE": True, "OP": "+"}]},
 ]
 
 def initialize_spacy_nlp():
     """
-    Initialize and return the SpaCy NLP pipeline with custom patterns.
-    Uses lazy loading to ensure the model is loaded only once.
-    
-    Returns:
-        spacy.language.Language: The initialized SpaCy NLP pipeline.
-    
-    Raises:
-        OSError: If the SpaCy model 'en_core_web_lg' is not installed.
+    Initialize and return the SpaCy NLP pipeline with custom patterns for redaction.
+    Loads the pipeline only once (lazy loading) for efficiency.
     """
     if not hasattr(initialize_spacy_nlp, "nlp"):
         try:
             nlp = spacy.load('en_core_web_lg')
+            # Add entity ruler for custom patterns before the named entity recognizer (NER)
             entity_ruler = nlp.add_pipe("entity_ruler", before="ner")
             entity_ruler.add_patterns(PHONE_PATTERNS + DATE_PATTERNS + ADDRESS_PATTERNS + NAME_PATTERNS)
-            nlp.add_pipe('sentencizer')
+            nlp.add_pipe('sentencizer')  # Adds sentence segmentation
             initialize_spacy_nlp.nlp = nlp
         except OSError as e:
             sys.stderr.write(
-                "SpaCy model 'en_core_web_lg' not found. Please install it using:\n"
-                "    python -m spacy download en_core_web_lg\n"
+                "SpaCy model 'en_core_web_lg' not found. Install it with: python -m spacy download en_core_web_lg\n"
             )
             raise e
     return initialize_spacy_nlp.nlp
 
 def initialize_hf_pipeline():
     """
-    Initialize and return the Hugging Face NER pipeline.
-    Uses lazy loading to ensure the pipeline is initialized only once.
-    
-    Returns:
-        transformers.pipeline.Pipeline: The initialized Hugging Face NER pipeline.
+    Initialize and return the Hugging Face NER pipeline for redaction.
+    Loads the pipeline only once for efficiency.
     """
     if not hasattr(initialize_hf_pipeline, "pipeline"):
         tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
@@ -126,24 +90,16 @@ def initialize_hf_pipeline():
 def merge_overlapping_spans(spans):
     """
     Merge overlapping or adjacent character spans.
-    
-    Args:
-        spans (list of tuples): List of (start, end) character indices.
-    
-    Returns:
-        list of tuples: Merged list of character index ranges.
     """
     if not spans:
         return []
 
-    # Sort spans by start index
     sorted_spans = sorted(spans, key=lambda x: x[0])
     merged = [sorted_spans[0]]
 
     for current_start, current_end in sorted_spans[1:]:
         last_start, last_end = merged[-1]
         if current_start <= last_end:
-            # Overlapping spans, merge them
             merged[-1] = (last_start, max(last_end, current_end))
         else:
             merged.append((current_start, current_end))
@@ -152,20 +108,11 @@ def merge_overlapping_spans(spans):
 
 def identify_concept_sentences(text, concepts):
     """
-    Identify sentences containing specified concepts for redaction.
-    
-    Args:
-        text (str): The text to search within.
-        concepts (list of str): List of concepts to find.
-    
-    Returns:
-        list of tuples: Character index ranges of sentences containing any of the concepts.
+    Identify sentences that contain specified concepts to redact.
     """
-    # Escape concepts for regex and compile pattern
     escaped_concepts = [re.escape(concept.lower()) for concept in concepts]
     concept_pattern = re.compile(r'\b(' + '|'.join(escaped_concepts) + r')\b', re.IGNORECASE)
 
-    # Split text into sentences
     sentence_pattern = re.compile(r'.+?(?:[.!?](?=\s)|\n|$)', re.DOTALL)
     concept_spans = []
 
@@ -178,24 +125,16 @@ def identify_concept_sentences(text, concepts):
 
 def redact_entities_spacy(text, targets, stats):
     """
-    Redact entities identified by SpaCy based on target categories.
-    
-    Args:
-        text (str): The text to redact.
-        targets (list of str): List of target categories to redact.
-        stats (dict): Dictionary to track redaction counts.
-    
-    Returns:
-        list of tuples: Character index ranges to redact.
+    Redact entities identified by SpaCy based on specified categories.
     """
     nlp = initialize_spacy_nlp()
     doc = nlp(text)
     redaction_spans = []
 
+    # Mapping entity labels to redaction categories
     label_mapping = {
         'PERSON': 'names',
         'DATE': 'dates',
-        'TIME': 'dates',
         'PHONE': 'phones',
         'GPE': 'addresses',
         'LOC': 'addresses'
@@ -212,20 +151,11 @@ def redact_entities_spacy(text, targets, stats):
 def redact_entities_hf(text, targets, stats):
     """
     Redact entities identified by Hugging Face NER based on target categories.
-    
-    Args:
-        text (str): The text to redact.
-        targets (list of str): List of target categories to redact.
-        stats (dict): Dictionary to track redaction counts.
-    
-    Returns:
-        list of tuples: Character index ranges to redact.
     """
     ner_pipeline = initialize_hf_pipeline()
     ner_results = ner_pipeline(text)
     redaction_spans = []
 
-    # Mapping Hugging Face entity labels to statistics keys
     hf_label_mapping = {
         'PER': 'names',
         'LOC': 'addresses'
@@ -242,21 +172,12 @@ def redact_entities_hf(text, targets, stats):
 def redact_email_headers(text, targets, stats):
     """
     Redact names found in email headers.
-    
-    Args:
-        text (str): The text to redact.
-        targets (list of str): List of target categories to redact.
-        stats (dict): Dictionary to track redaction counts.
-    
-    Returns:
-        list of tuples: Character index ranges to redact.
     """
     redaction_spans = []
 
     if 'names' not in targets:
         return redaction_spans
 
-    # Regex to match email headers
     header_pattern = re.compile(
         r'^(From|To|Cc|Bcc|X-From|X-To|X-cc|X-bcc):\s*(.*)',
         re.IGNORECASE | re.MULTILINE
@@ -265,7 +186,6 @@ def redact_email_headers(text, targets, stats):
     for match in header_pattern.finditer(text):
         header_content = match.group(2)
 
-        # Extract and redact names in the header content
         name_matches = re.finditer(r'\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)*\b', header_content)
         for name_match in name_matches:
             start = match.start(2) + name_match.start()
@@ -273,7 +193,6 @@ def redact_email_headers(text, targets, stats):
             redaction_spans.append((start, end))
             stats['names'] += 1
 
-        # Extract and redact names within email addresses
         email_pattern = re.compile(r'\b([\w\.-]+)@([\w\.-]+\.\w+)\b', re.IGNORECASE)
         for email_match in email_pattern.finditer(header_content):
             local_part = email_match.group(1)
@@ -286,33 +205,22 @@ def redact_email_headers(text, targets, stats):
                     end = start + len(part)
                     redaction_spans.append((start, end))
                     stats['names'] += 1
-                current_pos += len(part) + 1  # +1 for the separator
+                current_pos += len(part) + 1
 
     return redaction_spans
 
 def redact_entities_regex(text, targets, stats):
     """
     Redact entities identified by regular expressions based on target categories.
-    
-    Args:
-        text (str): The text to redact.
-        targets (list of str): List of target categories to redact.
-        stats (dict): Dictionary to track redaction counts.
-    
-    Returns:
-        list of tuples: Character index ranges to redact.
     """
     redaction_spans = []
 
-    # Redact names
     if 'names' in targets:
-        # Match capitalized names (e.g., 'John Doe')
         name_pattern = re.compile(r'\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)+\b')
         for match in name_pattern.finditer(text):
             redaction_spans.append((match.start(), match.end()))
             stats['names'] += 1
 
-        # Match names in email addresses (e.g., 'robert.badeer' in 'robert.badeer@enron.com')
         email_name_pattern = re.compile(r'\b([a-z]+(?:[\._][a-z]+)+)@[\w\.-]+\b', re.IGNORECASE)
         for match in email_name_pattern.finditer(text):
             local_part = match.group(1)
@@ -324,18 +232,14 @@ def redact_entities_regex(text, targets, stats):
                     end = start + len(part)
                     redaction_spans.append((start, end))
                     stats['names'] += 1
-                current_pos += len(part) + 1  # +1 for the separator
+                current_pos += len(part) + 1
 
-    # Redact phone numbers
     if 'phones' in targets:
-        phone_pattern = re.compile(
-            r'\b(\+?\d{1,2}[\s-])?(\(?\d{3}\)?[\s.-]?|\d{3}[\s.-]?)[\s.-]?\d{3}[\s.-]?\d{4}\b'
-        )
+        phone_pattern = re.compile(r'\b(\+?\d{1,2}[\s-])?(\(?\d{3}\)?[\s.-]?|\d{3}[\s.-]?)[\s.-]?\d{3}[\s.-]?\d{4}\b')
         for match in phone_pattern.finditer(text):
             redaction_spans.append((match.start(), match.end()))
             stats['phones'] += 1
 
-    # Redact dates
     if 'dates' in targets:
         date_pattern = re.compile(
             r'\b(?:\d{1,2}[/-])?\d{1,2}[/-]\d{2,4}\b|'
@@ -347,7 +251,6 @@ def redact_entities_regex(text, targets, stats):
             redaction_spans.append((match.start(), match.end()))
             stats['dates'] += 1
 
-    # Redact addresses
     if 'addresses' in targets:
         address_pattern = re.compile(
             r'('
@@ -355,10 +258,6 @@ def redact_entities_regex(text, targets, stats):
             r'(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|' 
             r'Lane|Ln\.?|Drive|Dr\.?|Court|Ct\.?|Highway|Hwy\.?|Place|Pl\.?|' 
             r'Square|Sq\.?|Building|Bldg\.?|Apartment|Apt\.?|Suite|Ste\.?)?'
-            r')'
-            r'|'
-            r'('
-            r'\b(?:[A-Z][a-z]+(?:\s|$)){1,3},?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?'
             r')',
             re.IGNORECASE | re.VERBOSE
         )
@@ -366,33 +265,11 @@ def redact_entities_regex(text, targets, stats):
             redaction_spans.append((match.start(), match.end()))
             stats['addresses'] += 1
 
-        # New multi-line address pattern
-        multi_line_address_pattern = re.compile(
-            r'''
-            # Line 1: City or Area (e.g., San Diego Downtown)
-            ^[A-Z][a-zA-Z\s]+$
-            \n
-            # Line 2: Street Address (e.g., 530 Broadway)
-            \d+\s+[A-Za-z\s]+$
-            \n
-            # Line 3: City, State ZIP (e.g., San Diego, CA  92101)
-            ^[A-Za-z\s]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?$
-            ''',
-            re.MULTILINE | re.VERBOSE
-        )
-        for match in multi_line_address_pattern.finditer(text):
-            redaction_spans.append((match.start(), match.end()))
-            stats['addresses'] += 1
-
     return redaction_spans
 
 def write_stats(stats, destination):
     """
-    Output redaction statistics to the specified destination.
-    
-    Args:
-        stats (dict): Dictionary containing redaction counts.
-        destination (str): Destination for statistics ('stderr', 'stdout', or file path).
+    Output redaction statistics to the specified destination (stderr, stdout, or file).
     """
     stats_report = (
         f"Names redacted: {stats.get('names', 0)}\n"
@@ -415,21 +292,14 @@ def write_stats(stats, destination):
 def process_file(file_path, args, stats):
     """
     Process and redact a single text file.
-    
-    Args:
-        file_path (str): Path to the input text file.
-        args (Namespace): Parsed command-line arguments.
-        stats (dict): Dictionary to track redaction counts.
     """
     try:
-        # Read the input file
         with open(file_path, 'r', encoding='utf-8') as f:
             text = f.read()
     except Exception as e:
         sys.stderr.write(f"Error reading file {file_path}: {e}\n")
         return
 
-    # Determine which entities to redact based on arguments
     entities_to_censor = []
     if args.names:
         entities_to_censor.append('names')
@@ -440,35 +310,29 @@ def process_file(file_path, args, stats):
     if args.address:
         entities_to_censor.append('addresses')
 
-    # Collect spans to redact from different models
     spans_to_redact = []
     spans_to_redact.extend(redact_email_headers(text, entities_to_censor, stats))
     spans_to_redact.extend(redact_entities_spacy(text, entities_to_censor, stats))
     spans_to_redact.extend(redact_entities_hf(text, entities_to_censor, stats))
     spans_to_redact.extend(redact_entities_regex(text, entities_to_censor, stats))
 
-    # Handle concept redaction separately
     if args.concept:
         concept_spans = identify_concept_sentences(text, args.concept)
         spans_to_redact.extend(concept_spans)
         stats['concepts'] += len(concept_spans)
 
-    # Merge overlapping spans
     merged_spans = merge_overlapping_spans(spans_to_redact)
 
-    # Apply redactions by replacing sensitive parts with block characters
     redacted_text = list(text)
     for start_char, end_char in merged_spans:
         for i in range(start_char, end_char):
-            if redacted_text[i] != '\n':  # Optionally preserve newlines
+            if redacted_text[i] != '\n':
                 redacted_text[i] = '█'
     final_text = ''.join(redacted_text)
 
-    # Define output file path
     base_name = os.path.basename(file_path)
     censored_file_name = os.path.join(args.output, f"{base_name}.censored")
 
-    # Write redacted text to the output file
     try:
         with open(censored_file_name, 'w', encoding='utf-8') as f:
             f.write(final_text)
@@ -492,7 +356,6 @@ def main():
     parser.add_argument('--stats', required=True, help='Destination for statistics (stderr, stdout, or filepath)')
     args = parser.parse_args()
 
-    # Initialize the statistics dictionary
     redaction_stats = {
         'names': 0,
         'dates': 0,
@@ -501,10 +364,8 @@ def main():
         'concepts': 0,
     }
 
-    # Create the output directory if it doesn't exist
     os.makedirs(args.output, exist_ok=True)
 
-    # Process each input file matching the glob patterns
     for pattern in args.input:
         matched_files = glob.glob(pattern)
         if not matched_files:
@@ -512,7 +373,6 @@ def main():
         for file_path in matched_files:
             process_file(file_path, args, redaction_stats)
 
-    # Write the redaction statistics to the specified destination
     write_stats(redaction_stats, args.stats)
 
 if __name__ == '__main__':
