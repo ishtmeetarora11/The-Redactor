@@ -61,6 +61,22 @@ Outputting Statistics: Writes redaction counts to the chosen destination (stdout
 ### initialize_spacy_nlp()
 
 ```
+    Command-Line Arguments
+    --input: Glob pattern to specify input files.
+    --output: Directory to save redacted files.
+    --names: Redacts names from the text. (Name of only Persons/People)
+    --dates: Redacts dates from the text.
+    --phones: Redacts phone numbers from the text.
+    --address: Redacts addresses from the text.
+    --concept: Specifies concepts to redact in sentences.
+    --stats: Specifies where to output redaction statistics (stderr, stdout, or a filepath).
+
+```
+
+
+### initialize_spacy_nlp()
+
+```
 def initialize_spacy_nlp():
 
     Initializes a SpaCy NLP pipeline with custom entity recognition patterns for redacting names, dates, phone numbers, and addresses. Uses lazy loading to load the model only once.
@@ -200,6 +216,8 @@ def write_stats(stats, destination):
 
         destination (str): Output destination for statistics.
 
+    This function accumulates counts for all redacted items across multiple files. If a redaction span is identified multiple times by different methods (e.g., SpaCy, Hugging Face, and regex)
+
 ```
 
 ### process_file(file_path, args, stats)
@@ -213,7 +231,7 @@ def write_stats(stats, destination):
         file_path (str): Path of the input file.
 
         args (Namespace): Parsed command-line arguments with options for redaction.
-        
+
         stats (dict): Dictionary to accumulate redaction statistics.
 
 ```
@@ -222,11 +240,11 @@ def write_stats(stats, destination):
 
 ### Assumptions
 
--> The incident data is assumed to be available in a PDF format at the provided URL. The code relies on this assumption, as it uses a PDF parser (PdfReader) to extract content.
+-> The redact_entities_regex function may not always recognize names accurately, especially in cases of uncommon names or names with special characters. It relies on capitalized words, which could lead to false positives (e.g., capitalized words in sentences being treated as names).
 
--> The create DB function assumes that we want to start with a clean database each time the script is run. It deletes the existing database (normanpd.db) if it already exists.
+-> The hardcoded patterns for dates, phone numbers, and addresses may not cover all possible formats encountered in real-world data. For instance, international phone number formats are not fully supported.
 
--> The connection passed to the function is assumed to be a valid SQLite connection object.
+-> The write_stats function directly increments redaction counts without checking for duplicates. This might cause inaccurate counts, especially if an entity is identified multiple times by different models.
 
 
 ## Test Cases
