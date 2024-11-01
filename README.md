@@ -25,26 +25,25 @@ pipenv install -e .
 
 ## How to run
 Run the following command on terminal
+
 ``` bash
-pipenv run python project0/main.py --incidents <pdf_url>
+python main.py --input <input_file_glob> --output <output_directory> [options]
 ```
 
-Example :
+Example:
+
 ``` bash
-pipenv run python project0/main.py --incidents "https://www.normanok.gov/sites/default/files/documents/2024-08/2024-08-01_daily_incident_summary.pdf"
+pipenv run python redactor.py --input '*.txt' \
+                    --names --dates --phones --address\
+                    --concept 'kids' \
+                    --output 'files/' \
+                    --stats stderr
 ```
 
 ## Running Test Cases
 ```bash
 pipenv run pytest
 ```
-
-## Project Demo
-
-
-https://github.com/user-attachments/assets/3c954d24-10b6-42a2-82b6-b188813ac506
-
-
 
 
 ## Functions
