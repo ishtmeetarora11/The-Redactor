@@ -1,4 +1,4 @@
-# cis6930fa24-project1
+# The Redactor
 
 Name: Ishtmeet Singh Arora
 
